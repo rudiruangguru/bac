@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galeri Video YouTube</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --lebar-tengah:72%;      /* lebar video di tengah; sisanya dipakai untuk video kiri & kanan yang mengintip */
+  --lebar-maks:640px;
+  --bg:#eef3ff;--ink:#12203a;--muted:#5a6b8c;--card:#ffffff;--red:#ff2e3b;--line:#d5e0fa;color-scheme:light
+}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1626;--ink:#eaf0ff;--muted:#9fb0d3;--card:#18233a;--line:#2a3857;color-scheme:dark}}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg);color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+body{min-height:100vh;padding:24px 0 40px;overflow-x:hidden}
+header{padding:0 16px 18px;max-width:900px;margin:0 auto;text-align:center}
+h1{font-size:clamp(1.4rem,5vw,2.1rem);font-weight:800;line-height:1.15}
+header p{color:var(--muted);margin-top:6px;font-size:.92rem}
+.slider{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:10px calc((100% - min(var(--lebar-tengah),var(--lebar-maks))) / 2)}
+.slider::-webkit-scrollbar{display:none}
+.card{flex:0 0 min(var(--lebar-tengah),var(--lebar-maks));scroll-snap-align:center;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer;text-align:left;padding:0;font:inherit;color:inherit;display:block;opacity:.6;transform:scale(.92);transition:transform .25s,opacity .25s}
+.card.on{opacity:1;transform:scale(1)}
+.card:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.thumb{position:relative;aspect-ratio:16/9;background:#000}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.play{position:absolute;inset:0;margin:auto;width:62px;height:43px;border-radius:12px;background:var(--red);display:grid;place-items:center;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.play::after{content:"";border-left:15px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:4px}
+.info{padding:11px 13px 13px}
+.info b{display:block;font-size:.95rem;line-height:1.3}
+.info span{font-size:.78rem;color:var(--red);font-weight:700}
+.nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px}
+.nav button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1.1rem;cursor:pointer}
+.nav button:focus-visible{outline:3px solid var(--red)}
+.dots{display:flex;gap:8px}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--line);transition:.2s}
+.dots i.on{background:var(--red);width:24px;border-radius:6px}
+.modal{position:fixed;inset:0;background:rgba(5,10,20,.88);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal.open{display:flex}
+.box{width:min(900px,100%)}
+.frame{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+.frame iframe{width:100%;height:100%;border:0}
+.acts{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.close,.share{display:inline-block;padding:10px 22px;border-radius:999px;border:0;font:700 .9rem 'Plus Jakarta Sans',sans-serif;cursor:pointer;text-decoration:none}
+.close{background:var(--red);color:#fff}
+.share{background:#1fa855;color:#fff}
+.share.luar{display:table;margin:14px auto 0}
+.share:focus-visible,.close:focus-visible{outline:3px solid #fff;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tonton video pilihan kami</h1>
+  <p>Geser ke kiri atau ke kanan untuk melihat video lainnya.</p>
+</header>
+
+<div class="slider" id="slider" aria-label="Daftar video"></div>
+<div class="nav">
+  <button id="prev" aria-label="Video sebelumnya">‹</button>
+  <div class="dots" id="dots"></div>
+  <button id="next" aria-label="Video berikutnya">›</button>
+</div>
+
+<a class="share luar" id="wa2" target="_blank" rel="noopener">Bagikan video ini lewat WA</a>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Pemutar video">
+  <div class="box">
+    <div class="frame" id="frame"></div>
+    <div class="acts"><a class="share" id="wa" target="_blank" rel="noopener">Bagikan lewat WA</a><button class="close" id="close">Tutup video</button></div>
+  </div>
+</div>
+
+<script>
+/* TEMPLATE: ganti "url" dan "judul". Thumbnail muncul otomatis. */
+const VIDEOS = [
+  { url: "https://www.youtube.com/watch?v=f3XSN3hyaXY", judul: "Video 1" },
+  { url: "https://www.youtube.com/watch?v=XHsS6oLgtQY", judul: "Video 2" },
+  { url: "https://www.youtube.com/watch?v=tgG2YyCAK5E", judul: "Video 3" },
+  { url: "https://www.youtube.com/watch?v=sgMI6eJbud8", judul: "Video 4" }
+];
+
+const ambilId = u => (u.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{11})/) || [])[1];
+const slider = document.getElementById('slider');
+const dots = document.getElementById('dots');
+const valid = VIDEOS.map(v => ({...v, id: ambilId(v.url)})).filter(v => v.id);
+const cards = [];
+
+valid.forEach((v, n) => {
+  const b = document.createElement('button');
+  b.className = 'card';
+  b.type = 'button';
+  b.setAttribute('aria-label', 'Putar: ' + v.judul);
+  b.innerHTML = '<div class="thumb"><img alt=""><div class="play"></div></div><div class="info"><b></b><span>Ketuk untuk menonton</span></div>';
+  b.querySelector('b').textContent = v.judul;
+  const img = b.querySelector('img');
+  const tries = ['maxresdefault','hqdefault','mqdefault'];
+  let i = 0;
+  const next = () => { if (++i < tries.length) img.src = 'https://i.ytimg.com/vi/' + v.id + '/' + tries[i] + '.jpg'; };
+  img.onerror = next;
+  img.onload = () => { if (img.naturalWidth <= 120) next(); };
+  img.src = 'https://i.ytimg.com/vi/' + v.id + '/' + tries[0] + '.jpg';
+  b.addEventListener('click', () => { n === aktif() ? buka(v) : pindah(n); });
+  slider.appendChild(b);
+  cards.push(b);
+  dots.appendChild(document.createElement('i'));
+});
+
+function aktif(){
+  const mid = slider.scrollLeft + slider.clientWidth / 2;
+  let best = 0, d = Infinity;
+  cards.forEach((c, i) => { const x = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (x < d){ d = x; best = i; } });
+  return best;
+}
+const linkWA = v => 'https://wa.me/?text=' + encodeURIComponent(v.judul + '\nhttps://www.youtube.com/watch?v=' + v.id);
+function tandai(){ const a = aktif(); document.getElementById('wa2').href = linkWA(valid[a]); cards.forEach((c, i) => c.classList.toggle('on', i === a)); [...dots.children].forEach((x, i) => x.classList.toggle('on', i === a)); }
+function pindah(n){
+  n = Math.max(0, Math.min(cards.length - 1, n));
+  const c = cards[n];
+  slider.scrollTo({left: c.offsetLeft + c.offsetWidth / 2 - slider.clientWidth / 2, behavior: 'smooth'});
+}
+slider.addEventListener('scroll', tandai, {passive: true});
+window.addEventListener('resize', () => { pindah(aktif()); tandai(); });
+document.getElementById('prev').onclick = () => pindah(aktif() - 1);
+document.getElementById('next').onclick = () => pindah(aktif() + 1);
+tandai();
+
+const modal = document.getElementById('modal'), frame = document.getElementById('frame');
+function buka(v){
+  document.getElementById('wa').href = linkWA(v);
+  frame.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + v.id + '?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Video YouTube"></iframe>';
+  modal.classList.add('open');
+}
+function tutup(){ modal.classList.remove('open'); frame.innerHTML = ''; }
+document.getElementById('close').onclick = tutup;
+modal.addEventListener('click', e => { if (e.target === modal) tutup(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') tutup(); });
+</script>
+</body>
+</html>
